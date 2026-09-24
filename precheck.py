@@ -1,3 +1,4 @@
+import config
 import ssl
 import socket
 from pyVim.connect import SmartConnect, Disconnect
@@ -27,21 +28,31 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
     passed = True
 
     # ==========================================
-    # CHECK 1: Pod CoreDNS Resolution for vCenter
+    # CHECK: Pod CoreDNS Resolution for vCenter
     # ==========================================
     print(f"=== 1. Validating vCenter DNS & Connectivity ===")
-    if not verify_dns_resolution(host):
-        passed = False
-        print("❌ FAIL: vCenter hostname unresolvable from this pod. Aborting further checks.")
-        return
+    if config.check_dns:
+        if not verify_dns_resolution(host):
+            passed = False
+            print("❌ FAIL: vCenter hostname unresolvable from this pod. Aborting further checks.")
+            return
+    else:
+        passed = True 
+        print("ℹ  STATUS: DNS resolution check Skipped")
         
-    #if not verify_tcp_port(host, 443):
-    #    passed = False
-    #    print("❌ FAIL: Cannot reach vCenter on management port 443. Aborting inventory checks.")
-    #    return
+
+    
+    if config.check_443:
+        if not verify_tcp_port(host, 443):
+            passed = False
+            print("❌ FAIL: Cannot reach vCenter on management port 443. Aborting inventory checks.")
+            return
+    else:
+        passed = True
+        print("ℹ  STATUS: Port 443 check Skipped")
 
     # ==========================================
-    # CHECK 2: vCenter Authentication
+    # CHECK: vCenter Authentication
     # ==========================================
     try:
         context = ssl._create_unverified_context()
@@ -56,6 +67,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         return
 
     try:
+
         # Locate the VM via Container View
         container = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)
         target_vm = None
@@ -72,7 +84,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         print(f"\n=== Running Kubernetes Migration Prechecks for: {target_vm.name} ===")
 
         # ==========================================
-        # CHECK 3: Dynamic ESXi Host DNS & Port 902
+        # CHECK: Dynamic ESXi Host DNS & Port 902
         # ==========================================
         print(f"\n--- Data Plane Verification ---")
         esxi_host_obj = target_vm.runtime.host
@@ -95,8 +107,46 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
             print("❌ FAIL: Unable to resolve parent ESXi host for runtime state calculation.")
             passed = False
 
+
         # ==========================================
-        # CHECK 4: Permissions / Privileges Check
+        # CHECK: VM Check
+        # ==========================================
+        print(f"\n--- VM Verification ---")
+
+        if config.check_vm:
+            print(f"Power State: {vm.runtime.powerState}")
+
+            # Extract Configured and Actual Guest OS IDs
+            config_guest_id = target_vm.summary.config.guestId             # What is in the .vmx file
+            config_guest_name = target_vm.summary.config.guestFullName
+    
+            runtime_guest_id = None
+            runtime_guest_name = None
+    
+            # Runtime info is only available if the VM is powered on with VMware Tools installed
+            if target_vm.summary.guest is not None:
+                runtime_guest_id = target_vm.summary.guest.guestId
+                runtime_guest_name = target_vm.summary.guest.guestFullName
+
+            primary_id = runtime_guest_id if runtime_guest_id else config_guest_id
+            print(f"Configured: {config_guest_id} ({config_guest_name})")
+            print(f"Runtime: {runtime_guest_id} ({runtime_guest_name})")
+            print(f"Primary: {primary_id}")
+
+    
+            if primary_id in config.virt_v2v_supported_guest_os:
+                print(f"✅ PASS:  {primary_id} is inherently supported by virt-v2v conversions.")
+                passed = True
+            else:
+                print(f"❌ FAIL:  {primary_id} is not in the explicit support dictionary.")
+                passed = False
+        else:
+            passed= True
+            print("ℹ  STATUS: VM check Skipped")
+
+
+        # ==========================================
+        # CHECK: Permissions / Privileges Check
         # ==========================================
         print(f"\n--- Authorization Verification ---")
         auth_manager = content.authorizationManager
@@ -116,7 +166,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
             print("✅ PASS: User possesses all required vSphere migration privileges.")
 
         # ==========================================
-        # CHECK 5: Hardware & Blueprint Configuration
+        # CHECK: Hardware & Blueprint Configuration
         # ==========================================
         print(f"\n--- Artifact & Compatibility Verification ---")
 
@@ -169,6 +219,5 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         Disconnect(si)
 
 if __name__ == "__main__":
-    required_privileges = ["VirtualMachine.Config.Resource"]
-    run_vm_migration_prechecks("tkg-cluster-01-md-0-f6b67bf8b-l459w", "172.17.0.66", "user", "pass", required_privileges)
+    run_vm_migration_prechecks(config.vm, config.host, config.user, config.passwd, config.required_privileges)
 
