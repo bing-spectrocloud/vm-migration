@@ -8,20 +8,20 @@ def verify_dns_resolution(hostname):
     """Verifies if the current container/pod environment can resolve the target FQDN."""
     try:
         ip_address = socket.gethostbyname(hostname)
-        print(f"  ✅ DNS: Successfully resolved '{hostname}' to {ip_address}.")
+        print(f"✅ DNS: Successfully resolved '{hostname}' to {ip_address}.")
         return True
     except socket.gaierror as e:
-        print(f"  ❌ DNS: Failed to resolve host '{hostname}'. Ensure your Kubernetes CoreDNS Upstream Forwarders include your vSphere DNS servers. Error: {str(e)}")
+        print(f"❌ DNS: Failed to resolve host '{hostname}'. Ensure your Kubernetes CoreDNS Upstream Forwarders include your vSphere DNS servers. Error: {str(e)}")
         return False
 
 def verify_tcp_port(ip_or_host, port, timeout=3):
     """Performs a brief socket handshake to confirm network line-of-sight."""
     try:
         with socket.create_connection((ip_or_host, port), timeout=timeout):
-            print(f"  ✅ Network: TCP port {port} is open on {ip_or_host}.")
+            print(f"✅ Network: TCP port {port} is open on {ip_or_host}.")
             return True
     except (socket.timeout, ConnectionRefusedError, socket.gaierror) as e:
-        print(f"  ❌ Network: Failed to connect to {ip_or_host}:{port}. Details: {str(e)}")
+        print(f"❌ Network: Failed to connect to {ip_or_host}:{port}. Details: {str(e)}")
         return False
 
 def run_vm_migration_prechecks(vm_name, host, user, password, required_privileges):
@@ -38,8 +38,8 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
             return
     else:
         passed = True 
-        print("ℹ  STATUS: DNS check Skipped")
-        
+        print(f"⚠  STATUS: DNS check Skipped")
+
     if config.check_443:
         if not verify_tcp_port(host, 443):
             passed = False
@@ -47,7 +47,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
             return
     else:
         passed = True
-        print("ℹ  STATUS: Port 443 check Skipped")
+        print(f"⚠  STATUS: Port 443 check Skipped")
 
     # ==========================================
     # CHECK: vCenter Authentication
@@ -93,7 +93,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         esxi_host_obj = target_vm.runtime.host
         if esxi_host_obj:
             esxi_name = esxi_host_obj.name
-            print(f"ℹ️  Target VM resides on ESXi Host: '{esxi_name}'")
+            print(f"ℹ  Target VM resides on ESXi Host: '{esxi_name}'")
             
             # Step A: Validate Pod can resolve the ESXi Host FQDN registered in vCenter
             if not verify_dns_resolution(esxi_name):
@@ -137,9 +137,10 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
                 runtime_guest_name = target_vm.summary.guest.guestFullName
 
             primary_id = runtime_guest_id if runtime_guest_id else config_guest_id
-            print(f"Configured: {config_guest_id} ({config_guest_name})")
-            print(f"Runtime: {runtime_guest_id} ({runtime_guest_name})")
-            print(f"Primary: {primary_id}")
+            print(f"  Guest OS")
+            print(f"    Configured: {config_guest_id} ({config_guest_name})")
+            print(f"    Runtime: {runtime_guest_id} ({runtime_guest_name})")
+            print(f"    Primary: {primary_id}")
 
     
             if primary_id in config.virt_v2v_supported_guest_os:
@@ -221,14 +222,14 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
                     passed = False
 
         if not has_attached_iso:
-            print("✅ PASS: No mounted ISO files detected.")
+            print(f"✅ PASS: No mounted ISO files detected.")
         if not has_rdm:
-            print("✅ PASS: No Raw Device Mappings (RDM) detected.")
+            print(f"✅ PASS: No Raw Device Mappings (RDM) detected.")
 
         # Summary Spec Metadata
         cpus = target_vm.config.hardware.numCPU
         memory_mb = target_vm.config.hardware.memoryMB
-        print("ℹ  SPEC METADATA -> vCPUs: {cpus}, RAM: {memory_mb}MB")
+        print(f"ℹ  SPEC METADATA -> vCPUs: {cpus}, RAM: {memory_mb}MB")
 
         print("\n====================================================")
         if passed:

@@ -19,6 +19,7 @@ required_privileges = [
   "VirtualMachine.Interact.PowerOff",
   "VirtualMachine.Inventory.CreateFromExisting",
   "VirtualMachine.Provisioning.DiskAccess",
+  "VirtualMachine.Provisioning.DiskManagement",
   "VirtualMachine.Provisioning.Export",
   "VirtualMachine.State.CreateSnapshot",
   "VirtualMachine.State.RemoveSnapshot"
@@ -26,7 +27,6 @@ required_privileges = [
 
 #https://libguestfs.org/virt-v2v-support.1.html
 virt_v2v_supported_guest_os = {
-    'vmwarePhoton64Guest',
     # Red Hat / CentOS / Rocky / Alma Linux
     'rhel4Guest', 'rhel4_64Guest', 'rhel5Guest', 'rhel5_64Guest',
     'rhel6Guest', 'rhel6_64Guest', 'rhel7Guest', 'rhel7_64Guest',
