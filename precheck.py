@@ -90,28 +90,41 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         # CHECK: Dynamic ESXi Host DNS & Port 902
         # ==========================================
         print(f"\n--- Host Verification ---")
-        esxi_host_obj = target_vm.runtime.host
-        if esxi_host_obj:
-            esxi_name = esxi_host_obj.name
-            print(f"ℹ  Target VM resides on ESXi Host: '{esxi_name}'")
+        host = target_vm.runtime.host
+        if host:
+            host_name = host.name
+            print(f"ℹ  Target VM resides on Host: '{host_name}'")
             
             # Step A: Validate Pod can resolve the ESXi Host FQDN registered in vCenter
-            if not verify_dns_resolution(esxi_name):
-                print(f"❌ FAIL: The migration pod cannot resolve the ESXi host FQDN '{esxi_name}'. Migration streaming will fail.")
+            if not verify_dns_resolution(host_name):
+                print(f"❌ FAIL: The migration pod cannot resolve the host FQDN '{host_name}'. Migration streaming will fail.")
                 passed = False
             
             # Step B: Validate Port 902 access for raw disk streaming (VDDK/NBD)
-            if not verify_tcp_port(esxi_name, 902):
-                print(f"❌ FAIL: Port 902 blocked on ESXi host '{esxi_name}'. Migration stream blocked.")
+            if not verify_tcp_port(host_name, 902):
+                print(f"❌ FAIL: Port 902 blocked on host '{host_name}'. Migration stream blocked.")
                 passed = False
             else:
-                print(f"✅ PASS: Data plane connectivity confirmed for host '{esxi_name}'.")
+                print(f"✅ PASS: Data plane connectivity confirmed for host '{host_name}'.")
 
+            # Step C: check if host is running
+            connection_state = host.runtime.connectionState
+            power_state = host.runtime.powerState
 
-            # Step C: check kernel.apparmor_restrict_unprivileged_userns
+            print(f"Connection State: {connection_state}") # e.g., 'connected', 'disconnected', 'notResponding'
+            print(f"Power State: {power_state}")         # e.g., 'poweredOn', 'poweredOff'
+
+            if connection_state == 'connected' and power_state == 'poweredOn':
+                passed= True
+                print(f"✅ PASS: {host_name} running and connected")
+            else:
+                passed= False
+                print(f"❌ Error: HOST '{host_name} not running or connected")
+
+            # Step D: check kernel.apparmor_restrict_unprivileged_userns
             try:
                 option_key = "kernel.apparmor_restrict_unprivileged_userns"
-                options = esxi_host_obj.configManager.advancedOption.QueryOptions(name=option_key)
+                options = host.configManager.advancedOption.QueryOptions(name=option_key)
 
                 if options:
                     for option in options:
