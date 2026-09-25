@@ -30,7 +30,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
     # ==========================================
     # CHECK: Pod CoreDNS Resolution for vCenter
     # ==========================================
-    print(f"=== 1. Validating vCenter DNS & Connectivity ===")
+    print(f"=== Validate vCenter DNS & Connectivity ===")
     if config.check_dns:
         if not verify_dns_resolution(host):
             passed = False
@@ -108,11 +108,8 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
                 print(f"✅ PASS: Data plane connectivity confirmed for host '{host_name}'.")
 
             # Step C: check if host is running
-            connection_state = host.runtime.connectionState
-            power_state = host.runtime.powerState
-
-            print(f"Connection State: {connection_state}") # e.g., 'connected', 'disconnected', 'notResponding'
-            print(f"Power State: {power_state}")         # e.g., 'poweredOn', 'poweredOff'
+            connection_state = host.runtime.connectionState # e.g., 'connected', 'disconnected', 'notResponding'
+            power_state = host.runtime.powerState           # e.g., 'poweredOn', 'poweredOff'
 
             if connection_state == 'connected' and power_state == 'poweredOn':
                 passed= True
@@ -120,26 +117,6 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
             else:
                 passed= False
                 print(f"❌ Error: HOST '{host_name} not running or connected")
-
-            # Step D: check kernel.apparmor_restrict_unprivileged_userns
-            try:
-                option_key = "kernel.apparmor_restrict_unprivileged_userns"
-                options = host.configManager.advancedOption.QueryOptions(name=option_key)
-
-                if options:
-                    for option in options:
-                        print(f"Host: {host.name}")
-                        print(f"Key: {option.key}")
-                        print(f"Value: {option.value}")
-                else:
-                    print(f"Option '{option_key}' not found or has no value on host {host.name}.")
-            except vmodl.fault.ManagedObjectNotFound as e:
-                print(f"❌ FAIL: {e.msg}")
-            except (vim.fault.InvalidName, vmodl.fault.InvalidArgument):
-                print(f"Error: '{option_key}' is not a recognized advanced option key on this ESXi host.")
-            except AttributeError as e:
-                print(f"Attribute error encountered: {e}")
-
 
         else:
             print("❌ FAIL: Unable to resolve parent ESXi host for runtime state calculation.")
