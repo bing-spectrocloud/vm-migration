@@ -89,7 +89,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         # ==========================================
         # CHECK: Dynamic ESXi Host DNS & Port 902
         # ==========================================
-        print(f"\n--- Data Plane Verification ---")
+        print(f"\n--- Host Verification ---")
         esxi_host_obj = target_vm.runtime.host
         if esxi_host_obj:
             esxi_name = esxi_host_obj.name
@@ -106,6 +106,28 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
                 passed = False
             else:
                 print(f"✅ PASS: Data plane connectivity confirmed for host '{esxi_name}'.")
+
+
+            # Step C: check kernel.apparmor_restrict_unprivileged_userns
+            try:
+                option_key = "kernel.apparmor_restrict_unprivileged_userns"
+                options = esxi_host_obj.configManager.advancedOption.QueryOptions(name=option_key)
+
+                if options:
+                    for option in options:
+                        print(f"Host: {host.name}")
+                        print(f"Key: {option.key}")
+                        print(f"Value: {option.value}")
+                else:
+                    print(f"Option '{option_key}' not found or has no value on host {host.name}.")
+            except vmodl.fault.ManagedObjectNotFound as e:
+                print(f"❌ FAIL: {e.msg}")
+            except (vim.fault.InvalidName, vmodl.fault.InvalidArgument):
+                print(f"Error: '{option_key}' is not a recognized advanced option key on this ESXi host.")
+            except AttributeError as e:
+                print(f"Attribute error encountered: {e}")
+
+
         else:
             print("❌ FAIL: Unable to resolve parent ESXi host for runtime state calculation.")
             passed = False
@@ -176,7 +198,8 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
 
         #for result in vc_permissions:
         #    # Access the privilege attribute on each individual item
-        #    print(f"Entity: {result.entity}, Privileges: {result.privileges}")
+      
+      #    print(f"Entity: {result.entity}, Privileges: {result.privileges}")
 
         user_privileges = vc_permissions[0].privileges if vc_permissions else []
        
