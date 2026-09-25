@@ -5,8 +5,26 @@ passwd = "pass"
 
 vm= "tkg-cluster-01-md-0-f6b67bf8b-l459w"
 
-required_privileges = ["VirtualMachine.Config.Resource"]
+required_privileges = [
+  "Datastore.Browse",
+  "Datastore.FileManagement",
+  "Global.CancelTask",
+  "Network.Assign",
+  "Resource.AssignVMToPool",
+  "System.Anonymous",
+  "System.Read",
+  "System.View",
+  "VirtualMachine.Config.AdvancedConfig",
+  "VirtualMachine.Config.Settings",
+  "VirtualMachine.Interact.PowerOff",
+  "VirtualMachine.Inventory.CreateFromExisting",
+  "VirtualMachine.Provisioning.DiskAccess",
+  "VirtualMachine.Provisioning.Export",
+  "VirtualMachine.State.CreateSnapshot",
+  "VirtualMachine.State.RemoveSnapshot"
+    ]
 
+#https://libguestfs.org/virt-v2v-support.1.html
 virt_v2v_supported_guest_os = {
     'vmwarePhoton64Guest',
     # Red Hat / CentOS / Rocky / Alma Linux
@@ -29,4 +47,5 @@ virt_v2v_supported_guest_os = {
 
 check_dns = False
 check_443 = False
-check_vm = False 
+check_vm = True
+check_902  = False  # for VDDK 

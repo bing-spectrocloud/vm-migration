@@ -38,10 +38,8 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
             return
     else:
         passed = True 
-        print("ℹ  STATUS: DNS resolution check Skipped")
+        print("ℹ  STATUS: DNS check Skipped")
         
-
-    
     if config.check_443:
         if not verify_tcp_port(host, 443):
             passed = False
@@ -58,7 +56,12 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         context = ssl._create_unverified_context()
         si = SmartConnect(host=host, user=user, pwd=password, port = "8989", sslContext=context)
         content = si.RetrieveContent()
+        about_info = content.about
         print("✅ PASS: Successfully authenticated with vCenter Server.")
+        print(f"Product Name: {about_info.name}")         # e.g., VMware vCenter Server
+        print(f"Version:      {about_info.version}")      # e.g., 7.0.3
+        print(f"Build:        {about_info.build}")        # e.g., 20150588
+        print(f"Full Name:    {about_info.fullName}")     # e.g., VMware vCenter Server 7.0.3
     except vmodl.MethodFault as e:
         print(f"❌ FAIL: Authentication failed. Details: {e.msg}")
         return
@@ -114,7 +117,12 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         print(f"\n--- VM Verification ---")
 
         if config.check_vm:
-            print(f"Power State: {vm.runtime.powerState}")
+            print(f"Power State: {target_vm.runtime.powerState}")
+            boot_options = vm.config.bootOptions
+            print(f"  Boot Options")
+            print(f"    Boot Delay (ms): {boot_options.bootDelay}")
+            print(f"    Enter BIOS/UEFI Setup on next boot: {boot_options.enterBIOSSetup}")
+            print(f"    Firmware type (bios or efi): {vm.config.firmware}")
 
             # Extract Configured and Actual Guest OS IDs
             config_guest_id = target_vm.summary.config.guestId             # What is in the .vmx file
@@ -140,6 +148,19 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
             else:
                 print(f"❌ FAIL:  {primary_id} is not in the explicit support dictionary.")
                 passed = False
+
+            
+            tools_status = target_vm.guest.toolsStatus  # e.g., 'toolsOk', 'toolsNotInstalled', etc.
+            tools_running_status = target_vm.guest.toolsRunningStatus  # e.g., 'running', 'notRunning'
+            tools_version = target_vm.guest.toolsVersion
+
+            if tools_status == "toolsNotInstalled":
+                print(f"✅ PASS: Tools Status: {tools_status} ")
+                passed = True
+            else:
+                passed = False
+                print(f"⚠  Tools Status: {tools_status}, {tools_version}, {tools_running_status} | Uninstall first")
+
         else:
             passed= True
             print("ℹ  STATUS: VM check Skipped")
@@ -207,7 +228,7 @@ def run_vm_migration_prechecks(vm_name, host, user, password, required_privilege
         # Summary Spec Metadata
         cpus = target_vm.config.hardware.numCPU
         memory_mb = target_vm.config.hardware.memoryMB
-        print(f"ℹ️  SPEC METADATA -> vCPUs: {cpus}, RAM: {memory_mb}MB")
+        print("ℹ  SPEC METADATA -> vCPUs: {cpus}, RAM: {memory_mb}MB")
 
         print("\n====================================================")
         if passed:
